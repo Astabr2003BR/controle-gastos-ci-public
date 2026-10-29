@@ -10,6 +10,15 @@ Ele **não contém** o código completo do aplicativo, histórico do repositóri
 - Gerar evidência de carga sem tocar em produção.
 - Reduzir o uso de GitHub Actions do repositório privado.
 
+## Acesso protegido ao sandbox
+
+O sandbox Floot pode exigir um preview token temporário. O workflow lê esse valor somente do GitHub Actions Secret chamado `FLOOT_PREVIEW_TOKEN`.
+
+- O token **nunca** deve ser commitado neste repositório.
+- O workflow é `workflow_dispatch` apenas; não executa em pull requests públicos.
+- O token não é impresso nos logs.
+- Quando o preview token expirar, apenas o Secret deve ser atualizado.
+
 ## Segurança
 
 O workflow valida o destino antes de iniciar e recusa qualquer host que não termine em `.sandbox.floot.app`.
