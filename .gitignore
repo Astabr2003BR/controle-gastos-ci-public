@@ -1,0 +1,32 @@
+# Secrets / environment
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+*service-account*.json
+*credentials*.json
+
+# App/private data
+backups/
+dumps/
+*.sql
+*.sqlite
+*.db
+*.bak
+
+# Build / dependencies
+node_modules/
+dist/
+build/
+coverage/
+*.apk
+*.aab
+
+# Local tooling
+.DS_Store
+.idea/
+.vscode/
