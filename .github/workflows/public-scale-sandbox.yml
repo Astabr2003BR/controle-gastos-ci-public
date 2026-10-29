@@ -2,10 +2,6 @@ name: Public scale sandbox gate
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/public-scale-sandbox.yml'
 
 permissions:
   contents: read
@@ -20,8 +16,9 @@ jobs:
     timeout-minutes: 15
     env:
       TARGET_BASE: https://60669cb6-48e8-4633-aaac-f95bf446bb48.sandbox.floot.app
+      FLOOT_PREVIEW_TOKEN: ${{ secrets.FLOOT_PREVIEW_TOKEN }}
     steps:
-      - name: Verify sandbox-only target
+      - name: Verify sandbox-only target and protected access
         shell: bash
         run: |
           node - <<'NODE'
@@ -29,7 +26,11 @@ jobs:
           if (u.protocol !== 'https:' || !u.hostname.endsWith('.sandbox.floot.app')) {
             throw new Error(`Refusing non-sandbox load target: ${u.origin}`);
           }
+          if (!process.env.FLOOT_PREVIEW_TOKEN) {
+            throw new Error('Missing FLOOT_PREVIEW_TOKEN repository secret');
+          }
           console.log(`Sandbox target accepted: ${u.origin}`);
+          console.log('Protected preview access: configured');
           NODE
 
       - name: Progressive virtual-user simulation
@@ -39,9 +40,14 @@ jobs:
           import { writeFileSync, appendFileSync } from 'node:fs';
 
           const base = process.env.TARGET_BASE;
+          const previewToken = process.env.FLOOT_PREVIEW_TOKEN;
           const target = new URL(base);
+
           if (target.protocol !== 'https:' || !target.hostname.endsWith('.sandbox.floot.app')) {
             throw new Error('Sandbox-only invariant failed');
+          }
+          if (!previewToken) {
+            throw new Error('Protected preview token is required');
           }
 
           const routes = [
@@ -69,17 +75,19 @@ jobs:
 
           async function oneRequest(index) {
             const route = routes[index % routes.length];
+            const url = new URL(route.path, base);
+            url.searchParams.set('ptoken', previewToken);
             const controller = new AbortController();
             const timer = setTimeout(() => controller.abort(), timeoutMs);
             const started = performance.now();
             try {
-              const response = await fetch(base + route.path, {
+              const response = await fetch(url, {
                 method: 'GET',
                 cache: 'no-store',
                 signal: controller.signal,
                 headers: {
                   accept: 'application/json,text/plain,*/*',
-                  'user-agent': 'controle-gastos-public-ci/1.0',
+                  'user-agent': 'controle-gastos-public-ci/1.1',
                 },
               });
               await response.arrayBuffer();
@@ -155,6 +163,7 @@ jobs:
             generatedAt: new Date().toISOString(),
             target: target.origin,
             sandboxOnly: true,
+            protectedAccess: true,
             stages: [],
           };
 
@@ -181,7 +190,7 @@ jobs:
           appendFileSync(
             process.env.GITHUB_STEP_SUMMARY,
             `## Controle de Gastos — sandbox load gate\n\n` +
-              `Target: \`${target.origin}\` (sandbox only)\n\n` +
+              `Target: \`${target.origin}\` (sandbox only, protected access)\n\n` +
               report.stages
                 .map((s) => `- ${s.users} VUs / conc ${s.concurrency}: p95 ${s.p95} ms, p99 ${s.p99} ms, ${s.throughputRps} req/s, unexpected ${s.unexpected}, 5xx ${s.server5xx}`)
                 .join('\n') +
